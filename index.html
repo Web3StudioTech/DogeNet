@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DogeNet — Balance Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#15110d;
+    --panel:#1d1812;
+    --panel-2:#241d15;
+    --border:#352b1f;
+    --text:#f3e8d9;
+    --text-dim:#9c9085;
+    --gold:#e8b13a;
+    --gold-dim:#7a5d22;
+    --green:#9fd676;
+    --red:#e0746a;
+    --radius:10px;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Sora', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .wrap{
+    max-width:880px;
+    margin:0 auto;
+    padding:48px 24px 80px;
+  }
+
+  header{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    margin-bottom:8px;
+  }
+
+  .coin{
+    width:40px; height:40px; flex:none;
+  }
+
+  h1{
+    font-size:1.5rem;
+    font-weight:700;
+    margin:0;
+    letter-spacing:0.02em;
+  }
+
+  h1 span{ color:var(--gold); }
+
+  .subtitle{
+    color:var(--text-dim);
+    font-size:0.9rem;
+    margin:4px 0 0;
+  }
+
+  .ledger-rule{
+    height:1px;
+    background:linear-gradient(90deg, var(--gold-dim), transparent);
+    margin:28px 0;
+  }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:20px;
+    margin-bottom:20px;
+  }
+
+  label{
+    display:block;
+    font-size:0.78rem;
+    text-transform:uppercase;
+    letter-spacing:0.12em;
+    color:var(--text-dim);
+    margin-bottom:8px;
+  }
+
+  textarea{
+    width:100%;
+    min-height:160px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    color:var(--text);
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.82rem;
+    line-height:1.5;
+    padding:12px;
+    resize:vertical;
+  }
+
+  textarea:focus, input:focus{
+    outline:none;
+    border-color:var(--gold-dim);
+  }
+
+  .row{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-top:16px;
+    align-items:flex-end;
+  }
+
+  .field{
+    flex:1;
+    min-width:160px;
+  }
+
+  .field.small{ max-width:140px; flex:none; }
+
+  input[type="text"], input[type="number"]{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    color:var(--text);
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.85rem;
+    padding:10px 12px;
+  }
+
+  .hint{
+    font-size:0.72rem;
+    color:var(--text-dim);
+    margin-top:6px;
+  }
+
+  button{
+    background:var(--gold);
+    color:#211a0f;
+    border:none;
+    border-radius:8px;
+    padding:11px 22px;
+    font-family:'Sora', sans-serif;
+    font-weight:600;
+    font-size:0.9rem;
+    cursor:pointer;
+    transition:filter 0.15s ease;
+  }
+
+  button:hover{ filter:brightness(1.08); }
+  button:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  button.ghost{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--text);
+  }
+  button.ghost:hover{ border-color:var(--gold-dim); filter:none; }
+
+  .stat-row{
+    display:flex;
+    gap:24px;
+    margin:18px 0 4px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.85rem;
+  }
+
+  .stat .num{ color:var(--gold); font-weight:700; font-size:1.1rem; }
+  .stat .label{ color:var(--text-dim); font-size:0.72rem; text-transform:uppercase; letter-spacing:0.1em; }
+
+  .progress-track{
+    height:6px;
+    background:var(--panel-2);
+    border-radius:4px;
+    overflow:hidden;
+    margin:14px 0;
+  }
+  .progress-fill{
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg, var(--gold-dim), var(--gold));
+    transition:width 0.2s ease;
+  }
+
+  .ledger{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.78rem;
+    max-height:220px;
+    overflow-y:auto;
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:var(--panel-2);
+  }
+
+  .ledger-row{
+    display:grid;
+    grid-template-columns:36px 1fr 110px 90px;
+    gap:10px;
+    padding:6px 12px;
+    border-bottom:1px solid var(--border);
+    align-items:center;
+    color:var(--text-dim);
+  }
+  .ledger-row:last-child{ border-bottom:none; }
+  .ledger-row .idx{ color:var(--text-dim); }
+  .ledger-row .addr{ color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ledger-row .bal{ text-align:right; }
+  .ledger-row.hit{ color:var(--green); }
+  .ledger-row.hit .addr{ color:var(--green); }
+  .ledger-row.err{ color:var(--red); }
+
+  .status-dot{
+    display:inline-block;
+    width:8px; height:8px;
+    border-radius:50%;
+    margin-right:6px;
+    background:var(--text-dim);
+  }
+  .status-dot.checking{ background:var(--gold); animation:pulse 0.9s infinite ease-in-out; }
+  .status-dot.hit{ background:var(--green); }
+  .status-dot.err{ background:var(--red); }
+
+  @keyframes pulse{
+    0%, 100% { opacity:1; }
+    50% { opacity:0.3; }
+  }
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.82rem;
+  }
+  th, td{
+    text-align:left;
+    padding:8px 10px;
+    border-bottom:1px solid var(--border);
+  }
+  th{
+    color:var(--text-dim);
+    font-size:0.7rem;
+    text-transform:uppercase;
+    letter-spacing:0.1em;
+    font-weight:400;
+  }
+  td.bal{ color:var(--green); text-align:right; font-weight:700; }
+  th.bal{ text-align:right; }
+
+  .empty{
+    color:var(--text-dim);
+    font-size:0.85rem;
+    padding:8px 0;
+  }
+
+  .top-actions{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+
+  footer{
+    color:var(--text-dim);
+    font-size:0.75rem;
+    text-align:center;
+    margin-top:32px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <svg class="coin" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="20" cy="20" r="19" stroke="#e8b13a" stroke-width="2"/>
+      <text x="20" y="27" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="20" font-weight="700" fill="#e8b13a">D</text>
+    </svg>
+    <div>
+      <h1>Doge<span>Net</span> Scanner</h1>
+      <p class="subtitle">Paste a list of Dogecoin addresses — find which ones hold more than your threshold.</p>
+    </div>
+  </header>
+
+  <div class="ledger-rule"></div>
+
+  <div class="panel">
+    <label for="input">Address list — any format (numbers, quotes, commas are ignored)</label>
+    <textarea id="input" placeholder='1,&quot;DTs3E2Dov1QsJPycJDxjsmQTsfgvujuwhR&#10;2,&quot;DCaq8FCHVXwaiuuyHF4f9SmgzqJyatyHDM&#10;...or just one address per line'></textarea>
+
+    <div class="row">
+      <div class="field small">
+        <label for="threshold">Threshold (DOGE)</label>
+        <input type="number" id="threshold" value="50" min="0" step="any">
+      </div>
+      <div class="field">
+        <label for="worker">Worker proxy URL</label>
+        <input type="text" id="worker" placeholder="https://dogenet-proxy.<your-subdomain>.workers.dev">
+        <p class="hint">Saved in this browser. Required because the balance API needs a CORS proxy — see worker.js in the repo.</p>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="scanBtn">Scan addresses</button>
+      <button id="cancelBtn" class="ghost" style="display:none;">Stop</button>
+    </div>
+  </div>
+
+  <div class="panel" id="progressPanel" style="display:none;">
+    <div class="top-actions">
+      <div class="stat-row">
+        <div class="stat"><div class="num" id="statChecked">0</div><div class="label">checked</div></div>
+        <div class="stat"><div class="num" id="statTotal">0</div><div class="label">total</div></div>
+        <div class="stat"><div class="num" id="statHits">0</div><div class="label">above threshold</div></div>
+      </div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="ledger" id="ledger"></div>
+  </div>
+
+  <div class="panel" id="resultsPanel" style="display:none;">
+    <div class="top-actions">
+      <label style="margin:0;">Results — above threshold</label>
+      <button class="ghost" id="exportBtn">Export CSV</button>
+    </div>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Address</th><th class="bal">Balance (DOGE)</th></tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+    <p class="empty" id="emptyMsg" style="display:none;">No addresses above the threshold.</p>
+  </div>
+
+  <footer>DogeNet Scanner · queries dogechain.info via a Cloudflare Worker proxy</footer>
+</div>
+
+<script>
+const ADDR_REGEX = /\bD[1-9A-HJ-NP-Za-km-z]{33}\b/g;
+
+const inputEl = document.getElementById('input');
+const thresholdEl = document.getElementById('threshold');
+const workerEl = document.getElementById('worker');
+const scanBtn = document.getElementById('scanBtn');
+const cancelBtn = document.getElementById('cancelBtn');
+const progressPanel = document.getElementById('progressPanel');
+const resultsPanel = document.getElementById('resultsPanel');
+const ledger = document.getElementById('ledger');
+const progressFill = document.getElementById('progressFill');
+const statChecked = document.getElementById('statChecked');
+const statTotal = document.getElementById('statTotal');
+const statHits = document.getElementById('statHits');
+const resultsBody = document.getElementById('resultsBody');
+const emptyMsg = document.getElementById('emptyMsg');
+const exportBtn = document.getElementById('exportBtn');
+
+// restore saved worker url
+const savedWorker = localStorage.getItem('dogenet_worker_url');
+if (savedWorker) workerEl.value = savedWorker;
+
+let cancelled = false;
+let results = [];
+
+function shortAddr(addr){
+  return addr.slice(0,8) + '…' + addr.slice(-6);
+}
+
+function addLedgerRow(idx, addr){
+  const row = document.createElement('div');
+  row.className = 'ledger-row';
+  row.id = 'row-' + idx;
+  row.innerHTML = `
+    <div class="idx">${idx}</div>
+    <div class="addr"><span class="status-dot checking"></span>${shortAddr(addr)}</div>
+    <div class="bal">checking…</div>
+    <div></div>
+  `;
+  ledger.appendChild(row);
+  ledger.scrollTop = ledger.scrollHeight;
+  return row;
+}
+
+function updateLedgerRow(row, status, balanceText){
+  const dot = row.querySelector('.status-dot');
+  const bal = row.querySelector('.bal');
+  dot.className = 'status-dot ' + status;
+  bal.textContent = balanceText;
+  if (status === 'hit') row.classList.add('hit');
+  if (status === 'err') row.classList.add('err');
+}
+
+async function checkBalance(address, workerUrl){
+  const url = workerUrl.replace(/\/$/, '') + '/?address=' + encodeURIComponent(address);
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.success !== 1) throw new Error(data.error || 'unknown error');
+  return parseFloat(data.balance);
+}
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+scanBtn.addEventListener('click', async () => {
+  const raw = inputEl.value;
+  const threshold = parseFloat(thresholdEl.value) || 0;
+  const workerUrl = workerEl.value.trim();
+
+  if (!workerUrl){
+    alert('Please enter your Cloudflare Worker proxy URL.');
+    return;
+  }
+  localStorage.setItem('dogenet_worker_url', workerUrl);
+
+  const matches = raw.match(ADDR_REGEX) || [];
+  const addresses = [...new Set(matches)];
+
+  if (addresses.length === 0){
+    alert('No valid Dogecoin addresses found in the pasted text.');
+    return;
+  }
+
+  // reset UI
+  cancelled = false;
+  results = [];
+  ledger.innerHTML = '';
+  resultsBody.innerHTML = '';
+  resultsPanel.style.display = 'none';
+  emptyMsg.style.display = 'none';
+  progressPanel.style.display = 'block';
+  statTotal.textContent = addresses.length;
+  statChecked.textContent = '0';
+  statHits.textContent = '0';
+  progressFill.style.width = '0%';
+
+  scanBtn.disabled = true;
+  cancelBtn.style.display = 'inline-block';
+
+  for (let i = 0; i < addresses.length; i++){
+    if (cancelled) break;
+    const addr = addresses[i];
+    const row = addLedgerRow(i + 1, addr);
+
+    let balance = null, err = null;
+    for (let attempt = 1; attempt <= 3; attempt++){
+      try {
+        balance = await checkBalance(addr, workerUrl);
+        break;
+      } catch (e) {
+        err = e.message;
+        if (attempt < 3) await sleep(700 * attempt);
+      }
+    }
+
+    if (balance === null){
+      updateLedgerRow(row, 'err', 'error');
+    } else if (balance > threshold){
+      updateLedgerRow(row, 'hit', balance.toFixed(2) + ' DOGE');
+      results.push({ address: addr, balance });
+      statHits.textContent = results.length;
+    } else {
+      updateLedgerRow(row, '', balance.toFixed(2) + ' DOGE');
+    }
+
+    statChecked.textContent = i + 1;
+    progressFill.style.width = ((i + 1) / addresses.length * 100) + '%';
+
+    await sleep(400);
+  }
+
+  scanBtn.disabled = false;
+  cancelBtn.style.display = 'none';
+
+  results.sort((a, b) => b.balance - a.balance);
+  renderResults();
+});
+
+cancelBtn.addEventListener('click', () => { cancelled = true; });
+
+function renderResults(){
+  resultsPanel.style.display = 'block';
+  resultsBody.innerHTML = '';
+  if (results.length === 0){
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+  results.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${r.address}</td><td class="bal">${r.balance.toFixed(2)}</td>`;
+    resultsBody.appendChild(tr);
+  });
+}
+
+exportBtn.addEventListener('click', () => {
+  const header = 'address,balance_doge\n';
+  const rows = results.map(r => `${r.address},${r.balance}`).join('\n');
+  const blob = new Blob([header + rows], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'addresses_above_threshold.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
