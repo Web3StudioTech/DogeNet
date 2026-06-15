@@ -6,6 +6,10 @@
 <title>DogeNet — Balance Scanner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
 <style>
   :root{
     --bg:#15110d;
@@ -263,6 +267,17 @@
     gap:12px;
   }
 
+  .export-group{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .export-group button{
+    padding:8px 14px;
+    font-size:0.78rem;
+  }
+
   footer{
     color:var(--text-dim);
     font-size:0.75rem;
@@ -323,7 +338,12 @@
   <div class="panel" id="resultsPanel" style="display:none;">
     <div class="top-actions">
       <label style="margin:0;">Results — above threshold</label>
-      <button class="ghost" id="exportBtn">Export CSV</button>
+      <div class="export-group">
+        <button class="ghost" id="exportCsvBtn">Export CSV</button>
+        <button class="ghost" id="exportXlsxBtn">Export Excel</button>
+        <button class="ghost" id="exportDocxBtn">Export Word</button>
+        <button class="ghost" id="exportPdfBtn">Export PDF</button>
+      </div>
     </div>
     <table>
       <thead>
@@ -334,7 +354,7 @@
     <p class="empty" id="emptyMsg" style="display:none;">No addresses above the threshold.</p>
   </div>
 
-  <footer>DogeNet Scanner · queries dogechain.info via a Cloudflare Worker proxy</footer>
+  <footer>DogeNet Scanner · queries the Dogecoin blockchain via a Cloudflare Worker proxy</footer>
 </div>
 
 <script>
@@ -354,7 +374,10 @@ const statTotal = document.getElementById('statTotal');
 const statHits = document.getElementById('statHits');
 const resultsBody = document.getElementById('resultsBody');
 const emptyMsg = document.getElementById('emptyMsg');
-const exportBtn = document.getElementById('exportBtn');
+const exportCsvBtn = document.getElementById('exportCsvBtn');
+const exportXlsxBtn = document.getElementById('exportXlsxBtn');
+const exportDocxBtn = document.getElementById('exportDocxBtn');
+const exportPdfBtn = document.getElementById('exportPdfBtn');
 
 // restore saved worker url
 const savedWorker = localStorage.getItem('dogenet_worker_url');
@@ -492,16 +515,114 @@ function renderResults(){
   });
 }
 
-exportBtn.addEventListener('click', () => {
-  const header = 'address,balance_doge\n';
-  const rows = results.map(r => `${r.address},${r.balance}`).join('\n');
-  const blob = new Blob([header + rows], { type: 'text/csv' });
+function downloadBlob(blob, filename){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'addresses_above_threshold.csv';
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function getTimestamp(){
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+
+// ----- CSV export -----
+exportCsvBtn.addEventListener('click', () => {
+  const header = 'address,balance_doge\n';
+  const rows = results.map(r => `${r.address},${r.balance}`).join('\n');
+  const blob = new Blob([header + rows], { type: 'text/csv' });
+  downloadBlob(blob, `dogenet_results_${getTimestamp()}.csv`);
+});
+
+// ----- Excel export (SheetJS) -----
+exportXlsxBtn.addEventListener('click', () => {
+  if (typeof XLSX === 'undefined'){
+    alert('Excel export library failed to load. Check your internet connection and try again.');
+    return;
+  }
+  const threshold = parseFloat(thresholdEl.value) || 0;
+  const data = [
+    ['#', 'Address', 'Balance (DOGE)'],
+    ...results.map((r, i) => [i + 1, r.address, r.balance]),
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 6 }, { wch: 40 }, { wch: 16 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Above Threshold');
+  XLSX.writeFile(wb, `dogenet_results_${getTimestamp()}.xlsx`);
+});
+
+// ----- Word export (docx) -----
+exportDocxBtn.addEventListener('click', async () => {
+  if (typeof docx === 'undefined'){
+    alert('Word export library failed to load. Check your internet connection and try again.');
+    return;
+  }
+  const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, HeadingLevel, WidthType } = docx;
+  const threshold = parseFloat(thresholdEl.value) || 0;
+
+  const headerRow = new TableRow({
+    children: ['#', 'Address', 'Balance (DOGE)'].map(text => new TableCell({
+      width: { size: text === 'Address' ? 50 : 25, type: WidthType.PERCENTAGE },
+      children: [new Paragraph({ children: [new TextRun({ text, bold: true })] })],
+    })),
+  });
+
+  const dataRows = results.map((r, i) => new TableRow({
+    children: [
+      new TableCell({ children: [new Paragraph(String(i + 1))] }),
+      new TableCell({ children: [new Paragraph(r.address)] }),
+      new TableCell({ children: [new Paragraph(r.balance.toFixed(2))] }),
+    ],
+  }));
+
+  const doc = new Document({
+    sections: [{
+      children: [
+        new Paragraph({ text: 'DogeNet Scanner — Results', heading: HeadingLevel.HEADING_1 }),
+        new Paragraph({ text: `Threshold: > ${threshold} DOGE` }),
+        new Paragraph({ text: `Generated: ${new Date().toLocaleString()}` }),
+        new Paragraph({ text: `Total addresses above threshold: ${results.length}` }),
+        new Paragraph({ text: '' }),
+        new Table({ rows: [headerRow, ...dataRows], width: { size: 100, type: WidthType.PERCENTAGE } }),
+      ],
+    }],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `dogenet_results_${getTimestamp()}.docx`);
+});
+
+// ----- PDF export (jsPDF + autotable) -----
+exportPdfBtn.addEventListener('click', () => {
+  if (typeof jspdf === 'undefined'){
+    alert('PDF export library failed to load. Check your internet connection and try again.');
+    return;
+  }
+  const threshold = parseFloat(thresholdEl.value) || 0;
+  const { jsPDF } = jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(16);
+  doc.text('DogeNet Scanner — Results', 14, 18);
+  doc.setFontSize(10);
+  doc.text(`Threshold: > ${threshold} DOGE`, 14, 26);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 32);
+  doc.text(`Total addresses above threshold: ${results.length}`, 14, 38);
+
+  doc.autoTable({
+    startY: 44,
+    head: [['#', 'Address', 'Balance (DOGE)']],
+    body: results.map((r, i) => [i + 1, r.address, r.balance.toFixed(2)]),
+    styles: { font: 'courier', fontSize: 8 },
+    headStyles: { fillColor: [232, 177, 58], textColor: [33, 26, 15] },
+  });
+
+  doc.save(`dogenet_results_${getTimestamp()}.pdf`);
 });
 </script>
 </body>
